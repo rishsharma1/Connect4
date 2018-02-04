@@ -1,4 +1,4 @@
-package connect4
+package connect4lib
 
 import (
 	"errors"
@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-type game struct {
+// Game stores the structure of the game
+type Game struct {
 	board   []string
 	columns int
 	rows    int
@@ -23,8 +24,9 @@ const BLACK = "B"
 // EMPTY board indicator
 const EMPTY = "-"
 
-func initGame(rows int, columns int) game {
-	g := game{}
+// InitGame will initialise a connect4 game
+func InitGame(rows int, columns int) Game {
+	g := Game{}
 	g.rows = rows
 	g.columns = columns
 
@@ -34,7 +36,8 @@ func initGame(rows int, columns int) game {
 	return g
 }
 
-func (g game) printGame() {
+// PrintGame prints the game to stdout
+func (g Game) PrintGame() {
 	fmt.Println()
 	for i := 0; i < g.rows; i++ {
 		for j := 0; j < g.columns; j++ {
@@ -45,7 +48,8 @@ func (g game) printGame() {
 	fmt.Println()
 }
 
-func (g game) playMove(column int, move string) error {
+// PlayMove plays the move at the specified column
+func (g Game) PlayMove(column int, move string) error {
 
 	for i := g.rows - 1; i >= 0; i-- {
 		if g.board[g.columns*i+column] == EMPTY {
@@ -56,7 +60,8 @@ func (g game) playMove(column int, move string) error {
 	return errors.New("invalid move: column selected is full")
 }
 
-func (g game) isWinGame() (bool, string) {
+// IsWinGame checks to see if the game is in a win state
+func (g Game) IsWinGame() (bool, string) {
 
 	for i := 0; i < g.rows; i++ {
 		for j := 0; j < g.columns; j++ {
@@ -83,7 +88,8 @@ func (g game) isWinGame() (bool, string) {
 	return false, ""
 }
 
-func (g game) isVertical(row int, column int, color string) bool {
+// isVertical checks to see if the game contains a vertiacal win
+func (g Game) isVertical(row int, column int, color string) bool {
 
 	if g.rows-row < 4 {
 		return false
@@ -96,7 +102,8 @@ func (g game) isVertical(row int, column int, color string) bool {
 	return true
 }
 
-func (g game) isHorizontal(row int, column int, color string) bool {
+// isHorizontal checks to see if the game contains a horizontal win
+func (g Game) isHorizontal(row int, column int, color string) bool {
 
 	if g.columns-column < 4 {
 		return false
@@ -109,7 +116,8 @@ func (g game) isHorizontal(row int, column int, color string) bool {
 	return true
 }
 
-func (g game) isRightDiagonal(row int, column int, color string) bool {
+// isRightDiagonal checks to see if the game contains a right diagonal win
+func (g Game) isRightDiagonal(row int, column int, color string) bool {
 
 	if g.columns-column < 4 {
 		return false
@@ -125,7 +133,8 @@ func (g game) isRightDiagonal(row int, column int, color string) bool {
 	return true
 }
 
-func (g game) isLeftDiagonal(row int, column int, color string) bool {
+// isLeftDiagonal checks to see if the game contains a left diagonal win
+func (g Game) isLeftDiagonal(row int, column int, color string) bool {
 
 	if g.rows-row < 4 {
 		return false
@@ -141,17 +150,18 @@ func (g game) isLeftDiagonal(row int, column int, color string) bool {
 	return true
 }
 
-func loadGame(filename string) game {
-	g := game{}
+// LoadGame loads a game from a file
+func LoadGame(filename string) Game {
+	g := Game{}
 	b, err := ioutil.ReadFile(filename)
-	handleError(err)
+	HandleError(err)
 
 	s := strings.Split(string(b), "\n")
 	gameInfo := strings.Split(s[0], ",")
 	rows, err := strconv.Atoi(gameInfo[0])
-	handleError(err)
+	HandleError(err)
 	columns, err := strconv.Atoi(gameInfo[1])
-	handleError(err)
+	HandleError(err)
 	g.rows = rows
 	g.columns = columns
 
