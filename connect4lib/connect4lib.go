@@ -10,9 +10,9 @@ import (
 
 // Game stores the structure of the game
 type Game struct {
-	board   []string
-	columns int
-	rows    int
+	Board   []string
+	Columns int
+	Rows    int
 }
 
 // RED player indicator
@@ -27,11 +27,11 @@ const EMPTY = "-"
 // InitGame will initialise a connect4 game
 func InitGame(rows int, columns int) Game {
 	g := Game{}
-	g.rows = rows
-	g.columns = columns
+	g.Rows = rows
+	g.Columns = columns
 
 	for i := 0; i < rows*columns; i++ {
-		g.board = append(g.board, EMPTY)
+		g.Board = append(g.Board, EMPTY)
 	}
 	return g
 }
@@ -39,9 +39,9 @@ func InitGame(rows int, columns int) Game {
 // PrintGame prints the game to stdout
 func (g Game) PrintGame() {
 	fmt.Println()
-	for i := 0; i < g.rows; i++ {
-		for j := 0; j < g.columns; j++ {
-			fmt.Print(g.board[g.columns*i+j])
+	for i := 0; i < g.Rows; i++ {
+		for j := 0; j < g.Columns; j++ {
+			fmt.Print(g.Board[g.Columns*i+j])
 		}
 		fmt.Println()
 	}
@@ -51,9 +51,9 @@ func (g Game) PrintGame() {
 // PlayMove plays the move at the specified column
 func (g Game) PlayMove(column int, move string) error {
 
-	for i := g.rows - 1; i >= 0; i-- {
-		if g.board[g.columns*i+column] == EMPTY {
-			g.board[g.columns*i+column] = move
+	for i := g.Rows - 1; i >= 0; i-- {
+		if g.Board[g.Columns*i+column] == EMPTY {
+			g.Board[g.Columns*i+column] = move
 			return nil
 		}
 	}
@@ -63,11 +63,11 @@ func (g Game) PlayMove(column int, move string) error {
 // IsWinGame checks to see if the game is in a win state
 func (g Game) IsWinGame() (bool, string) {
 
-	for i := 0; i < g.rows; i++ {
-		for j := 0; j < g.columns; j++ {
+	for i := 0; i < g.Rows; i++ {
+		for j := 0; j < g.Columns; j++ {
 
-			if g.board[g.columns*i+j] != EMPTY {
-				color := g.board[g.columns*i+j]
+			if g.Board[g.Columns*i+j] != EMPTY {
+				color := g.Board[g.Columns*i+j]
 				// need to check below vertically
 				wonVertically := g.isVertical(i, j, color)
 				// need to check to the right horizontally
@@ -91,11 +91,11 @@ func (g Game) IsWinGame() (bool, string) {
 // isVertical checks to see if the game contains a vertiacal win
 func (g Game) isVertical(row int, column int, color string) bool {
 
-	if g.rows-row < 4 {
+	if g.Rows-row < 4 {
 		return false
 	}
 	for k := 0; k < 4; k++ {
-		if g.board[g.columns*(k+row)+column] != color {
+		if g.Board[g.Columns*(k+row)+column] != color {
 			return false
 		}
 	}
@@ -105,11 +105,11 @@ func (g Game) isVertical(row int, column int, color string) bool {
 // isHorizontal checks to see if the game contains a horizontal win
 func (g Game) isHorizontal(row int, column int, color string) bool {
 
-	if g.columns-column < 4 {
+	if g.Columns-column < 4 {
 		return false
 	}
 	for k := 0; k < 4; k++ {
-		if g.board[g.columns*row+(column+k)] != color {
+		if g.Board[g.Columns*row+(column+k)] != color {
 			return false
 		}
 	}
@@ -119,14 +119,14 @@ func (g Game) isHorizontal(row int, column int, color string) bool {
 // isRightDiagonal checks to see if the game contains a right diagonal win
 func (g Game) isRightDiagonal(row int, column int, color string) bool {
 
-	if g.columns-column < 4 {
+	if g.Columns-column < 4 {
 		return false
 	}
-	if g.rows-row < 4 {
+	if g.Rows-row < 4 {
 		return false
 	}
 	for k := 0; k < 4; k++ {
-		if g.board[g.columns*(k+row)+(column+k)] != color {
+		if g.Board[g.Columns*(k+row)+(column+k)] != color {
 			return false
 		}
 	}
@@ -136,14 +136,14 @@ func (g Game) isRightDiagonal(row int, column int, color string) bool {
 // isLeftDiagonal checks to see if the game contains a left diagonal win
 func (g Game) isLeftDiagonal(row int, column int, color string) bool {
 
-	if g.rows-row < 4 {
+	if g.Rows-row < 4 {
 		return false
 	}
 	if column+1 < 4 {
 		return false
 	}
 	for k := 0; k < 4; k++ {
-		if g.board[g.columns*(row+k)+(column-k)] != color {
+		if g.Board[g.Columns*(row+k)+(column-k)] != color {
 			return false
 		}
 	}
@@ -162,12 +162,12 @@ func LoadGame(filename string) Game {
 	HandleError(err)
 	columns, err := strconv.Atoi(gameInfo[1])
 	HandleError(err)
-	g.rows = rows
-	g.columns = columns
+	g.Rows = rows
+	g.Columns = columns
 
 	for i := 1; i < len(s); i++ {
 		for j := 0; j < len(s[i]); j++ {
-			g.board = append(g.board, string(s[i][j]))
+			g.Board = append(g.Board, string(s[i][j]))
 		}
 	}
 
