@@ -2,8 +2,7 @@ package connect4lib
 
 import (
 	"encoding/json"
-	"fmt"
-	"net"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -13,7 +12,7 @@ import (
 // Player represents the connect4 player
 // storing their connection and username
 type Player struct {
-	Conn     net.Conn
+	Conn     *websocket.Conn
 	UserName string
 }
 
@@ -28,18 +27,23 @@ type OnlineGame struct {
 	Winner       string
 }
 
-// Response is the struct that sent by
-// the client
+// Response is the struct that sent
+// and received by the client
 type Response struct {
-	Action  string
-	Content map[string]string
+	Action  string            `json:"action"`
+	Content map[string]string `json:"content"`
 }
 
+// upgrader responsible for upgrading
+// http requests to a websockets
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
+
+// queue of players
+var queue = []Player{}
 
 // StartGame starts the connect4 game between playerOne and PlayerTwo with
 // rows and columns defined
@@ -48,7 +52,7 @@ func StartGame(playerOne Player, playerTwo Player, rows int, columns int) {
 	defer playerOne.Conn.Close()
 	defer playerTwo.Conn.Close()
 
-	connMap := make(map[string]net.Conn)
+	connMap := make(map[string]*websocket.Conn)
 	connMap[playerOne.UserName] = playerOne.Conn
 	connMap[playerTwo.UserName] = playerTwo.Conn
 	g := OnlineGame{}
@@ -60,17 +64,17 @@ func StartGame(playerOne Player, playerTwo Player, rows int, columns int) {
 	g.PlayerColors[playerTwo.UserName] = BLACK
 	g.CurrentTurn = playerOne.UserName
 
+	// send inital update game message
+	updateGameMessage(g, playerOne)
+	updateGameMessage(g, playerTwo)
+
 	// game can now start
 	for {
 
-		updateGameMessage(g, playerOne)
-		updateGameMessage(g, playerTwo)
-
 		currTurnConn := connMap[g.CurrentTurn]
-		request := make([]byte, 512)
-		readLen, err := currTurnConn.Read(request)
+		_, msg, err := currTurnConn.ReadMessage()
 		HandleError(err)
-		response := DecodeResponse(request[:readLen])
+		response := DecodeResponse(msg)
 
 		if response.Action == "playMove" {
 			err := playMoveHandler(&g, response)
@@ -84,16 +88,16 @@ func StartGame(playerOne Player, playerTwo Player, rows int, columns int) {
 
 }
 
+// updateGameMessage sends an update game message to the player
 func updateGameMessage(og OnlineGame, player Player) {
 
 	b, _ := json.Marshal(og)
-	fmt.Println(string(b))
 	sendMessage(string(b), player.Conn)
-	//go fmt.Println(string(b))
 }
 
-func sendMessage(message string, conn net.Conn) {
-	conn.Write([]byte(message))
+// sendMessage sends message to the conn
+func sendMessage(message string, conn *websocket.Conn) {
+	conn.WriteMessage(websocket.TextMessage, []byte(message))
 }
 
 // DecodeResponse decodes the response into a Response struct
@@ -105,11 +109,11 @@ func DecodeResponse(data []byte) Response {
 }
 
 // InitPlayerHandler handles requests related to initialising a player
-func InitPlayerHandler(conn net.Conn, response Response) Player {
+func InitPlayerHandler(conn *websocket.Conn, response Response) Player {
 
 	p := Player{}
 	p.Conn = conn
-	p.UserName = response.Content["userName"]
+	p.UserName = response.Content["UserName"]
 	return p
 
 }
@@ -118,7 +122,7 @@ func InitPlayerHandler(conn net.Conn, response Response) Player {
 func playMoveHandler(game *OnlineGame, response Response) error {
 
 	err := game.playMove(response)
-	HandleError(err)
+	CheckError(err)
 
 	wonGame, winner := game.OGame.IsWinGame()
 	if wonGame {
@@ -143,7 +147,8 @@ func (og OnlineGame) playMove(response Response) error {
 func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
-	checkError(err)
+	CheckError(err)
+
 	go func(conn *websocket.Conn) {
 		defer conn.Close()
 		for {
@@ -151,14 +156,18 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				break
 			}
-			fmt.Println(string(msg))
+			r := DecodeResponse(msg)
+			if r.Action == "init" {
+				player := InitPlayerHandler(conn, r)
+				log.Println("Player Connected:", player.UserName)
+				queue = append(queue, player)
+			}
+			if len(queue) > 1 {
+				p1 := queue[0]
+				p2 := queue[1]
+				log.Println("Starting Game:", p1.UserName, "vs", p2.UserName)
+				go StartGame(p1, p2, 6, 7)
+			}
 		}
 	}(conn)
-}
-
-func checkError(err error) {
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 }
