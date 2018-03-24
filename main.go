@@ -5,7 +5,6 @@ import (
 	"net/http"
 )
 
-
 func main() {
 
 	http.HandleFunc("/ws", connect4lib.ConnectionHandler)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os/exec"
 	"strconv"
 
 	"github.com/gorilla/websocket"
@@ -22,9 +23,10 @@ type OnlineGame struct {
 	OGame        Game
 	Moves        int
 	PlayerColors map[string]string
-	CurrentTurn  string
 	GameState    string
 	Winner       string
+	GameKey      string
+	Players      []Player
 }
 
 // Response is the struct that sent
@@ -32,6 +34,13 @@ type OnlineGame struct {
 type Response struct {
 	Action  string            `json:"action"`
 	Content map[string]string `json:"content"`
+}
+
+// UpdateResponse is the struct that is
+// sent to update game
+type UpdateResponse struct {
+	Action string     `json:"action"`
+	Og     OnlineGame `json:"og"`
 }
 
 // upgrader responsible for upgrading
@@ -42,19 +51,32 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
+// UPDATE is the message identifier for
+// an update message
+const UPDATE = "UPDATE_MESSAGE"
+
+// UPDATEREQUEST is the messaage identifier
+// for a request made by the client asking
+// for a game update
+const UPDATEREQUEST = "UPDATE_REQUEST"
+
+// INIT is the message identifier for
+// a player initialisation message
+const INIT = "INIT"
+
+// PLAYMOVE is the message identifier for
+// a player move message
+const PLAYMOVE = "PLAY_MOVE"
+
 // queue of players
 var queue = []Player{}
+var gameMap = make(map[string]OnlineGame)
+var channelMap = make(map[string]chan *OnlineGame)
 
 // StartGame starts the connect4 game between playerOne and PlayerTwo with
 // rows and columns defined
 func StartGame(playerOne Player, playerTwo Player, rows int, columns int) {
 
-	defer playerOne.Conn.Close()
-	defer playerTwo.Conn.Close()
-
-	connMap := make(map[string]*websocket.Conn)
-	connMap[playerOne.UserName] = playerOne.Conn
-	connMap[playerTwo.UserName] = playerTwo.Conn
 	g := OnlineGame{}
 	g.PlayerColors = make(map[string]string)
 	g.OGame = InitGame(rows, columns)
@@ -62,42 +84,42 @@ func StartGame(playerOne Player, playerTwo Player, rows int, columns int) {
 	// Make this allocation random
 	g.PlayerColors[playerOne.UserName] = RED
 	g.PlayerColors[playerTwo.UserName] = BLACK
-	g.CurrentTurn = playerOne.UserName
+
+	gameKey, _ := exec.Command("uuidgen").Output()
+	g.GameKey = string(gameKey)
+	gameMap[string(gameKey)] = g
+	channelMap[string(gameKey)] = make(chan *OnlineGame)
+	g.Players = append(g.Players, playerOne, playerTwo)
 
 	// send inital update game message
 	updateGameMessage(g, playerOne)
 	updateGameMessage(g, playerTwo)
-
-	// game can now start
-	for {
-
-		currTurnConn := connMap[g.CurrentTurn]
-		_, msg, err := currTurnConn.ReadMessage()
-		HandleError(err)
-		response := DecodeResponse(msg)
-
-		if response.Action == "playMove" {
-			err := playMoveHandler(&g, response)
-			// need to handle specific wrong move error
-			HandleError(err)
-			updateGameMessage(g, playerOne)
-			updateGameMessage(g, playerTwo)
-		}
-
-	}
 
 }
 
 // updateGameMessage sends an update game message to the player
 func updateGameMessage(og OnlineGame, player Player) {
 
-	b, _ := json.Marshal(og)
+	resp := UpdateResponse{}
+	resp.Action = UPDATE
+	resp.Og = og
+	b, _ := json.Marshal(resp)
 	sendMessage(string(b), player.Conn)
 }
 
 // sendMessage sends message to the conn
 func sendMessage(message string, conn *websocket.Conn) {
 	conn.WriteMessage(websocket.TextMessage, []byte(message))
+}
+
+func sendUpdateGameMessage(player Player, response Response) {
+
+	log.Println("Inside send update game message.")
+	og := <-channelMap[response.Content["GameKey"]]
+	log.Println("Received played move from other player.")
+	log.Println(og)
+	updateGameMessage(*og, player)
+
 }
 
 // DecodeResponse decodes the response into a Response struct
@@ -122,6 +144,7 @@ func InitPlayerHandler(conn *websocket.Conn, response Response) Player {
 func playMoveHandler(game *OnlineGame, response Response) error {
 
 	err := game.playMove(response)
+	log.Println("Playe Move By:", response.Content["UserName"])
 	CheckError(err)
 
 	wonGame, winner := game.OGame.IsWinGame()
@@ -130,15 +153,18 @@ func playMoveHandler(game *OnlineGame, response Response) error {
 		game.GameState = "won"
 
 	}
+	log.Println(game)
+	gameChannel := channelMap[game.GameKey]
+	go func() { gameChannel <- game }()
 	return err
 }
 
 // playMove plays the move specified by the username
 func (og OnlineGame) playMove(response Response) error {
 
-	column, err := strconv.Atoi(response.Content["column"])
-	HandleError(err)
-	color := og.PlayerColors[og.CurrentTurn]
+	column, err := strconv.Atoi(response.Content["Column"])
+	userName := response.Content["UserName"]
+	color := og.PlayerColors[userName]
 	err = og.OGame.PlayMove(column, color)
 	return err
 }
@@ -150,23 +176,34 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 	CheckError(err)
 
 	go func(conn *websocket.Conn) {
-		defer conn.Close()
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
 			r := DecodeResponse(msg)
-			if r.Action == "init" {
+			if r.Action == INIT {
 				player := InitPlayerHandler(conn, r)
 				log.Println("Player Connected:", player.UserName)
 				queue = append(queue, player)
+			} else if r.Action == PLAYMOVE {
+				g := gameMap[r.Content["GameKey"]]
+				err := playMoveHandler(&g, r)
+				HandleError(err)
+				player := InitPlayerHandler(conn, r)
+				updateGameMessage(g, player)
+			} else if r.Action == UPDATEREQUEST {
+				log.Println("update request came in")
+				player := InitPlayerHandler(conn, r)
+				log.Println("update request user: ", player.UserName)
+				sendUpdateGameMessage(player, r)
 			}
 			if len(queue) > 1 {
 				p1 := queue[0]
 				p2 := queue[1]
+				queue = queue[2:]
 				log.Println("Starting Game:", p1.UserName, "vs", p2.UserName)
-				go StartGame(p1, p2, 6, 7)
+				StartGame(p1, p2, 6, 7)
 			}
 		}
 	}(conn)
