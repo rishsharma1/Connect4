@@ -154,14 +154,14 @@ func (g Game) isLeftDiagonal(row int, column int, color string) bool {
 func LoadGame(filename string) Game {
 	g := Game{}
 	b, err := ioutil.ReadFile(filename)
-	HandleError(err)
+	LogError(err)
 
 	s := strings.Split(string(b), "\n")
 	gameInfo := strings.Split(s[0], ",")
 	rows, err := strconv.Atoi(gameInfo[0])
-	HandleError(err)
+	LogError(err)
 	columns, err := strconv.Atoi(gameInfo[1])
-	HandleError(err)
+	LogError(err)
 	g.Rows = rows
 	g.Columns = columns
 
