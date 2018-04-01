@@ -4,7 +4,7 @@ In an attempt to learn golang, I attempt to create connect4 multiplayer game wit
 # Future Functionality
 
 ## UI
-* Add winner/loser alerts
+* ~~Add winner/loser alerts~~
 * Add invalid move alerts
 * Handle client disconnection
   * Add alerts to notify client disconnection
