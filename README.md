@@ -5,7 +5,7 @@ In an attempt to learn golang, I attempt to create connect4 multiplayer game wit
 
 ## UI
 * ~~Add winner/loser alerts~~
-* Add invalid move alerts
+* ~~Add invalid move alerts~~
 * Handle client disconnection
   * Add alerts to notify client disconnection
 * Handle backend server not available case
@@ -16,7 +16,7 @@ In an attempt to learn golang, I attempt to create connect4 multiplayer game wit
 
 ## Game Summary
 * Add time elapsed
-* Add game winner title
+* ~~Add game winner title~~
 * Add number of total moves played
 * Add functionality to replay the same opponent
   * Both players must ACK before a rematch can occur
