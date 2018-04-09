@@ -7,27 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// UPDATE is the message identifier for
-// an update message
-const UPDATE = "UPDATE_MESSAGE"
-
-// UPDATEREQUEST is the messaage identifier
-// for a request made by the client asking
-// for a game update
-const UPDATEREQUEST = "UPDATE_REQUEST"
-
-// INIT is the message identifier for
-// a player initialisation message
-const INIT = "INIT"
-
-// PLAYMOVE is the message identifier for
-// a player move message
-const PLAYMOVE = "PLAY_MOVE"
-
-// INVALIDMOVE is the message identifier for
-// a player move invalid message
-const INVALIDMOVE = "INVALID_MOVE"
-
 // InitPlayerHandler handles requests related to initialising a player
 func InitPlayerHandler(conn *websocket.Conn, response Response) Player {
 
@@ -39,9 +18,13 @@ func InitPlayerHandler(conn *websocket.Conn, response Response) Player {
 }
 
 // PlayMoveHandler handles playMove requests
-func PlayMoveHandler(game *OnlineGame, response Response) error {
+func PlayMoveHandler(conn *websocket.Conn, response Response) error {
 
+	gameKey := response.Content["GameKey"]
+	game := GetOnlineGame(gameKey)
+	player := InitPlayerHandler(conn, response)
 	err := game.PlayMove(response)
+
 	if err == nil {
 
 		userName := response.Content["UserName"]
@@ -59,10 +42,19 @@ func PlayMoveHandler(game *OnlineGame, response Response) error {
 
 		}
 		log.Println(game)
-		gameChannel := GetGameChannel(game.GameKey)
+		gameChannel, err := GetGameChannel(gameKey)
+		LogError(err)
 		log.Println(gameChannel)
-		go func() { gameChannel <- game }()
-		return err
+		go func(gameChannel chan *OnlineGame, game *OnlineGame) {
+			gameChannel <- game
+		}(gameChannel, &game)
+		UpdateGameMessage(game, player)
+
+	} else {
+
+		LogError(err)
+		InvalidMoveMessage(player)
+
 	}
 
 	return err
@@ -82,24 +74,22 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			r := DecodeResponse(msg)
-			if r.Action == INIT {
+			action := r.Action
+			if action == INIT {
 				p := InitPlayerHandler(conn, r)
 				InsertPlayerQueue(p)
 				log.Println("Player Connected:", p.UserName)
-			} else if r.Action == PLAYMOVE {
-				gameKey := r.Content["GameKey"]
-				g := GetOnlineGame(gameKey)
-				err := PlayMoveHandler(&g, r)
-				LogError(err)
-				player := InitPlayerHandler(conn, r)
-				updateGameMessage(g, player)
-			} else if r.Action == UPDATEREQUEST {
+			} else if action == PLAYMOVE {
+				PlayMoveHandler(conn, r)
+			} else if action == UPDATEREQUEST {
 				player := InitPlayerHandler(conn, r)
 				SendUpdateGameMessage(player, r)
 			}
-			if len(queue) > 1 {
-				p1 := PopPlayerQueue()
-				p2 := PopPlayerQueue()
+			if GetPlayerQueueLen() > 1 {
+				p1, err := PopPlayerQueue()
+				LogError(err)
+				p2, err := PopPlayerQueue()
+				LogError(err)
 				log.Println("Starting Game:", p1.UserName, "vs", p2.UserName)
 				InitOnlineGame(p1, p2, 6, 7)
 			}

@@ -2,6 +2,7 @@ package connect4lib
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -80,15 +81,19 @@ func InitOnlineGame(playerOne Player, playerTwo Player, rows int, columns int) {
 	g.Players = append(g.Players, playerOne, playerTwo)
 
 	// send inital update game message
-	updateGameMessage(g, playerOne)
-	updateGameMessage(g, playerTwo)
+	UpdateGameMessage(g, playerOne)
+	UpdateGameMessage(g, playerTwo)
 
 }
 
 // GetGameChannel returns a game channel for the given
 // game key
-func GetGameChannel(gameKey string) chan *OnlineGame {
-	return CHANNELMAP[gameKey]
+func GetGameChannel(gameKey string) (chan *OnlineGame, error) {
+
+	if CHANNELMAP[gameKey] == nil {
+		return nil, errors.New("Game does not exist")
+	}
+	return CHANNELMAP[gameKey], nil
 }
 
 // GetOnlineGame returns the state of the online game
@@ -97,12 +102,22 @@ func GetOnlineGame(gameKey string) OnlineGame {
 	return GAMEMAP[gameKey]
 }
 
+// GetPlayerQueueLen returns the size of the player queue
+func GetPlayerQueueLen() int {
+	return len(QUEUE)
+}
+
 // PopPlayerQueue returns the next Player in the queue
 // waiting for a game
-func PopPlayerQueue() Player {
+func PopPlayerQueue() (Player, error) {
+
+	if len(QUEUE) < 1 {
+		return Player{}, errors.New("Player queue is empty")
+	}
+
 	p := QUEUE[0]
 	QUEUE = QUEUE[1:]
-	return p
+	return p, nil
 }
 
 // InsertPlayerQueue appends the player to the queue of
@@ -111,36 +126,19 @@ func InsertPlayerQueue(player Player) {
 	QUEUE = append(QUEUE, player)
 }
 
-// updateGameMessage sends an update game message to the player
-func updateGameMessage(og OnlineGame, player Player) {
-
-	resp := UpdateResponse{}
-	resp.Action = UPDATE
-	resp.Og = og
-	b, _ := json.Marshal(resp)
-	sendMessage(string(b), player.Conn)
-}
-
-// sendMessage sends message to the conn
-func sendMessage(message string, conn *websocket.Conn) {
-	conn.WriteMessage(websocket.TextMessage, []byte(message))
-}
-
-// SendUpdateGameMessage sends an update game message to the
-// waiting player
-func SendUpdateGameMessage(player Player, response Response) {
-
-	og := <-CHANNELMAP[response.Content["GameKey"]]
-	updateGameMessage(*og, player)
-
-}
-
 // DecodeResponse decodes the response into a Response struct
 func DecodeResponse(data []byte) Response {
 	var r Response
 	err := json.Unmarshal(data, &r)
 	LogError(err)
 	return r
+}
+
+// NewResponse creates a new response struct
+func NewResponse() Response {
+	resp := Response{}
+	resp.Content = make(map[string]string)
+	return resp
 }
 
 // PlayMove plays the move specified by the username
