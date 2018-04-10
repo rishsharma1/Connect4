@@ -17,6 +17,6 @@ In an attempt to learn golang, I attempt to create connect4 multiplayer game wit
 ## Game Summary
 * Add time elapsed
 * ~~Add game winner title~~
-* Add number of total moves played
+* ~~Add number of total moves played~~
 * Add functionality to replay the same opponent
   * Both players must ACK before a rematch can occur
