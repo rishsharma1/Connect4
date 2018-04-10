@@ -56,7 +56,7 @@ var upgrader = websocket.Upgrader{
 var QUEUE = []Player{}
 
 // GAMEMAP is a maps unique game keys to game states
-var GAMEMAP = make(map[string]OnlineGame)
+var GAMEMAP = make(map[string]*OnlineGame)
 
 // CHANNELMAP maps unique game keys to game channels
 var CHANNELMAP = make(map[string]chan *OnlineGame)
@@ -76,7 +76,7 @@ func InitOnlineGame(playerOne Player, playerTwo Player, rows int, columns int) {
 
 	gameKey, _ := exec.Command("uuidgen").Output()
 	g.GameKey = string(gameKey)
-	GAMEMAP[string(gameKey)] = g
+	GAMEMAP[string(gameKey)] = &g
 	CHANNELMAP[string(gameKey)] = make(chan *OnlineGame)
 	g.Players = append(g.Players, playerOne, playerTwo)
 
@@ -98,7 +98,7 @@ func GetGameChannel(gameKey string) (chan *OnlineGame, error) {
 
 // GetOnlineGame returns the state of the online game
 // for the given game key
-func GetOnlineGame(gameKey string) OnlineGame {
+func GetOnlineGame(gameKey string) *OnlineGame {
 	return GAMEMAP[gameKey]
 }
 
@@ -142,11 +142,12 @@ func NewResponse() Response {
 }
 
 // PlayMove plays the move specified by the username
-func (og OnlineGame) PlayMove(response Response) error {
+func (og *OnlineGame) PlayMove(response Response) error {
 
 	column, err := strconv.Atoi(response.Content["Column"])
 	userName := response.Content["UserName"]
 	color := og.PlayerColors[userName]
+	og.Moves++
 	err = og.OGame.PlayMove(column, color)
 	return err
 }

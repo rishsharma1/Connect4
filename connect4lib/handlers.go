@@ -45,10 +45,11 @@ func PlayMoveHandler(conn *websocket.Conn, response Response) error {
 		gameChannel, err := GetGameChannel(gameKey)
 		LogError(err)
 		log.Println(gameChannel)
+
 		go func(gameChannel chan *OnlineGame, game *OnlineGame) {
 			gameChannel <- game
-		}(gameChannel, &game)
-		UpdateGameMessage(game, player)
+		}(gameChannel, game)
+		UpdateGameMessage(*game, player)
 
 	} else {
 

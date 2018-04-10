@@ -42,6 +42,7 @@ func UpdateGameMessage(og OnlineGame, player Player) {
 func InvalidMoveMessage(player Player) {
 
 	resp := NewResponse()
+	resp.Action = INVALIDMOVE
 	resp.Content["UserName"] = player.UserName
 	b, _ := json.Marshal(resp)
 	sendMessage(string(b), player.Conn)
